@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulasi Fisika: Dua Balok & Katrol</title>
+<style>
+:root {
+  --bg: #f5f5f0; --fg: #1a1a1a; --muted: #666; --card: #fff;
+  --primary: #2c5f8a; --primary-hover: #1e4a6e; --accent: #d4a843;
+  --danger: #c0392b; --success: #27ae60; --warning: #e67e22;
+  --purple: #8e44ad; --black: #2c2c2c; --blue: #2980b9; --red: #e74c3c; --teal: #16a085;
+  --shadow: 0 2px 8px rgba(0,0,0,.08); --radius: 10px; --transition: .15s ease;
+  --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #141414; --fg: #eee; --muted: #999; --card: #1e1e1e; --shadow: 0 2px 8px rgba(0,0,0,.4); }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--fg);min-height:100vh;display:flex;flex-direction:column}
+header{padding:12px 16px;background:var(--card);border-bottom:1px solid rgba(0,0,0,.08);position:sticky;top:0;z-index:10}
+header h1{font-size:1.1rem;font-weight:600;display:flex;align-items:center;gap:8px}
+header h1::before{content:'⚙️';font-size:1.2rem}
+main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#app{flex:1;display:flex;flex-direction:column;overflow:hidden}
+@media (min-width: 900px){
+  #app{flex-direction:row}
+}
+#canvas-wrap{flex:1;position:relative;min-height:400px;background:var(--bg);overflow:hidden}
+#canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#canvas.dragging{cursor:grabbing}
+#canvas.hover-drag{cursor:grab}
+.panel{width:100%;max-width:380px;background:var(--card);border-left:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;overflow-y:auto;padding:12px;gap:12px}
+@media (max-width: 899px){
+  .panel{border-left:none;border-top:1px solid rgba(0,0,0,.08);max-width:none;max-height:50vh;position:sticky;bottom:0}
+}
+.section{background:rgba(0,0,0,.03);border-radius:var(--radius);padding:10px 12px}
+.section h3{font-size:.85rem;font-weight:600;margin-bottom:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+.section h3::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--primary)}
+.param-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.param-row label{min-width:70px;font-size:.85rem;color:var(--fg);white-space:nowrap}
+.param-row input[type=range]{flex:1;height:6px;-webkit-appearance:none;background:rgba(0,0,0,.1);border-radius:3px;outline:none}
+.param-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--primary);cursor:pointer;box-shadow:var(--shadow);transition:transform var(--transition)}
+.param-row input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+.param-row input[type=number]{width:60px;padding:4px 8px;border:1px solid rgba(0,0,0,.15);border-radius:6px;background:var(--bg);color:var(--fg);font-size:.8rem;text-align:right}
+.param-row select{flex:1;padding:4px 8px;border:1px solid rgba(0,0,0,.15);border-radius:6px;background:var(--bg);color:var(--fg);font-size:.8rem}
+.btn-row{display:flex;gap:6px;margin-top:4px}
+button{flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;transition:var(--transition);font-family:inherit}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-secondary{background:rgba(0,0,0,.08);color:var(--fg)}
+.btn-secondary:hover{background:rgba(0,0,0,.15)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-danger:hover{background:#a93226}
+.btn-accent{background:var(--accent);color:#1a1a1a}
+.checkbox-row{display:flex;align-items:center;gap:8px;font-size:.8rem;margin:4px 0;cursor:pointer}
+.checkbox-row input{width:16px;height:16px;accent-color:var(--primary);cursor:pointer}
+.badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.badge-balanced{background:rgba(39,174,96,.15);color:var(--success);border:1px solid rgba(39,174,96,.3)}
+.badge-moving-down{background:rgba(231,76,60,.15);color:var(--danger);border:1px solid rgba(231,76,60,.3)}
+.badge-moving-up{background:rgba(230,126,34,.15);color:var(--warning);border:1px solid rgba(230,126,34,.3)}
+.formula{font-family:'Courier New',monospace;font-size:.75rem;line-height:1.6;background:rgba(0,0,0,.04);padding:8px;border-radius:6px;overflow-x:auto;white-space:pre-wrap}
+.formula .step{opacity:.7;margin:2px 0}
+.formula .step.current{opacity:1;color:var(--primary);font-weight:600}
+.formula .sub{vertical-align:sub;font-size:.7em}
+.formula .sup{vertical-align:super;font-size:.7em}
+.math{font-family:'Courier New',monospace;font-size:.8rem}
+.tooltip{position:relative;cursor:help;border-bottom:1px dotted var(--muted)}
+.tooltip::after{content:attr(data-tip);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--black);color:#fff;padding:6px 10px;border-radius:6px;font-size:.7rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s;z-index:100;margin-bottom:4px}
+.tooltip::before{content:'';position:absolute;bottom:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--black);opacity:0;pointer-events:none;transition:opacity .2s}
+.tooltip:hover::after,.tooltip:hover::before{opacity:1}
+.table{width:100%;border-collapse:collapse;font-size:.75rem}
+.table td,.table th{padding:4px 8px;text-align:left;border-bottom:1px solid rgba(0,0,0,.08)}
+.table th{color:var(--muted);font-weight:500;font-size:.7rem;text-transform:uppercase}
+.table tr:last-child td{border:none}
+.legend{display:flex;flex-wrap:wrap;gap:8px;font-size:.7rem;margin-top:8px}
+.legend-item{display:flex;align-items:center;gap:4px}
+.legend-color{width:18px;height:3px;border-radius:2px}
+.explanation{font-size:.8rem;line-height:1.6;color:var(--fg)}
+.explanation p{margin:6px 0}
+.explanation .analogy{background:rgba(212,168,67,.15);padding:8px;border-radius:6px;border-left:3px solid var(--accent);font-size:.75rem}
+.explanation .question{background:rgba(44,95,138,.1);padding:8px;border-radius:6px;border-left:3px solid var(--primary);font-size:.75rem;font-style:italic}
+.explanation .key-term{font-weight:600;color:var(--primary)}
+.hidden{display:none!important}
+.fps-counter{position:fixed;bottom:10px;right:10px;background:rgba(0,0,0,.7);color:#0f0;padding:4px 8px;border-radius:4px;font-family:monospace;font-size:.7rem;z-index:1000;pointer-events:none}
+.preset-btns{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.preset-btns button{padding:6px 8px;font-size:.7rem}
+.drag-hint{font-size:.7rem;color:var(--muted);text-align:center;padding:8px;background:rgba(212,168,67,.1);border-radius:6px;margin-top:8px}
+.mode-toggle{display:flex;gap:4px;background:rgba(0,0,0,.05);border-radius:6px;padding:2px}
+.mode-toggle button{flex:1;padding:4px 8px;font-size:.7rem;border-radius:4px;background:transparent;color:var(--muted)}
+.mode-toggle button.active{background:var(--primary);color:#fff}
+.help-icon{display:inline-flex;width:14px;height:14px;border-radius:50%;background:var(--primary);color:#fff;font-size:.7rem;align-items:center;justify-content:center;margin-left:4px;cursor:help;flex-shrink:0}
+</style>
+</head>
+<body>
+<header><h1>Simulasi Fisika: Dua Balok & Katrol</h1></header>
+<main id="app">
+  <div id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+  <aside class="panel" id="panel">
+    <div class="section">
+      <h3>⚙️ Parameter</h3>
+      <div class="param-row"><label for="m1">m₁ (kg)</label><input type="range" id="m1" min="0.1" max="20" step="0.1" value="2"><input type="number" id="m1-num" min="0.1" max="20" step="0.1" value="2"></div>
+      <div class="param-row"><label for="m2">m₂ (kg)</label><input type="range" id="m2" min="0.1" max="20" step="0.1" value="2"><input type="number" id="m2-num" min="0.1" max="20" step="0.1" value="2"></div>
+      <div class="param-row"><label for="theta">θ (°)</label><input type="range" id="theta" min="0" max="80" step="1" value="30"><input type="number" id="theta-num" min="0" max="80" step="1" value="30"></div>
+      <div class="param-row"><label for="mus">μs</label><input type="range" id="mus" min="0" max="1" step="0.01" value="0.3"><input type="number" id="mus-num" min="0" max="1" step="0.01" value="0.3"></div>
+      <div class="param-row"><label for="muk">μk</label><input type="range" id="muk" min="0" max="1" step="0.01" value="0.2"><input type="number" id="muk-num" min="0" max="1" step="0.01" value="0.2"></div>
+      <div class="param-row"><label for="g">g</label><select id="g-preset"><option value="9.8">Bumi (9,8)</option><option value="1.62">Bulan (1,62)</option><option value="3.71">Mars (3,71)</option><option value="24.8">Jupiter (24,8)</option><option value="custom">Kustom…</option></select><input type="number" id="g-custom" min="0.1" max="50" step="0.01" value="9.8" style="display:none;width:80px"></div>
+    </div>
+    <div class="section">
+      <h3>▶️ Kontrol</h3>
+      <div class="btn-row"><button id="btn-start" class="btn-primary">Mulai</button><button id="btn-reset" class="btn-secondary">Reset</button></div>
+      <div class="param-row" style="margin-top:8px"><label for="speed">Kecepatan</label><input type="range" id="speed" min="0.25" max="2" step="0.25" value="1"><input type="number" id="speed-num" min="0.25" max="2" step="0.25" value="1" style="width:50px"></div>
+    </div>
+    <div class="section">
+      <h3>👁️ Tampilkan Vektor</h3>
+      <div class="checkbox-row"><input type="checkbox" id="show-W" checked><label for="show-W">W (Berat)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="show-N" checked><label for="show-N">N (Normal)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="show-T" checked><label for="show-T">T (Tegangan)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="show-f" checked><label for="show-f">f (Gesek)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="show-Wsin" checked><label for="show-Wsin">W sin θ</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="show-Wcos" checked><label for="show-Wcos">W cos θ</label></div>
+    </div>
+    <div class="section">
+      <h3>🎯 Preset Skenario</h3>
+      <div class="preset-btns">
+        <button class="btn-secondary" data-preset="balanced">Seimbang</button>
+        <button class="btn-secondary" data-preset="m2-down">Balok 2 Turun</button>
+        <button class="btn-secondary" data-preset="m1-down">Balok 1 Turun</button>
+        <button class="btn-secondary" data-preset="no-friction">Tanpa Gesek</button>
+        <button class="btn-secondary" data-preset="moon">Di Bulan</button>
+      </div>
+    </div>
+    <div class="section">
+      <h3>📊 Status</h3>
+      <div id="status-badge" class="badge badge-balanced">Diam (seimbang)</div>
+      <div id="status-reason" style="margin-top:6px;font-size:.8rem;color:var(--muted);line-height:1.5"></div>
+    </div>
+    <div class="section">
+      <h3>📚 Hukum yang Berlaku</h3>
+      <div id="laws" class="explanation" style="font-size:.8rem"></div>
+    </div>
+    <div class="section">
+      <h3>🧮 Rumus & Perhitungan</h3>
+      <div class="mode-toggle"><button id="mode-beginner" class="active">Pemula</button><button id="mode-full">Lengkap</button></div>
+      <div id="formulas" class="formula"></div>
+    </div>
+    <div class="section">
+      <h3>💡 Penjelasan</h3>
+      <div id="explanation" class="explanation"></div>
+    </div>
+    <div class="section">
+      <h3>📋 Ringkasan</h3>
+      <table class="table" id="summary-table"><tbody></tbody></table>
+    </div>
+    <div class="section">
+      <h3>🎨 Legenda Warna</h3>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="drag-hint" id="drag-hint">💡 Seret balok atau titik sudut θ untuk mengubah posisi. Simulasi dijeda saat diseret.</div>
+  </aside>
+</main>
+<div class="fps-counter hidden" id="fps-counter">FPS: 60 | Render: 0.00ms</div>
+<script>
+// ============================================================
+// PHYSICS ENGINE (Pure Logic, No DOM)
+// ============================================================
+const Physics = (() => {
+  const state = {
+    m1: 2, m2: 2, theta: 30, mus: 0.3, muk: 0.2, g: 9.8,
+    running: false, speed: 1,
+    x1: 0, y1: 0, x2: 0, y2: 0,
+    v: 0, // positive = m2 down, m1 up incline
+    // geometry
+    inclineLen: 0, pulleyX: 0, pulleyY: 0, groundY: 0,
+    // derived
+    W1: 0, W1sin: 0, W1cos: 0, W2: 0, N: 0, fsMax: 0, fk: 0,
+    netForce: 0, a: 0, T: 0, friction: 0, moving: false, movingDir: 0 // +1 m2 down, -1 m1 down
+  };
+  const listeners = new Set();
+  const notify = () => listeners.forEach(fn => fn(state));
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const deg2rad = d => d * Math.PI / 180;
+  const rad2deg = r => r * 180 / Math.PI;
+  function recomputeGeometry() {
+    const { theta, inclineLen, pulleyX, pulleyY, groundY } = state;
+    const rad = deg2rad(theta);
+    state.inclineLen = Math.max(100, Math.min(500, 300 / Math.max(0.3, Math.sin(rad))));
+    state.pulleyX = 50 + state.inclineLen * Math.cos(rad);
+    state.pulleyY = 50;
+    state.groundY = state.pulleyY + 300;
+  }
+  function recomputePhysics() {
+    const { m1, m2, theta, mus, muk, g } = state;
+    const rad = deg2rad(theta);
+    const s = Math.sin(rad), c = Math.cos(rad);
+    state.W1 = m1 * g;
+    state.W1sin = state.W1 * s;
+    state.W1cos = state.W1 * c;
+    state.W2 = m2 * g;
+    state.N = m1 * g * c;
+    state.fsMax = mus * state.N;
+    state.fk = muk * state.N;
+    const driveDiff = state.W2 - state.W1sin;
+    const absDrive = Math.abs(driveDiff);
+    if (absDrive <= state.fsMax + 1e-9) {
+      state.moving = false;
+      state.movingDir = 0;
+      state.a = 0;
+      state.friction = driveDiff; // static friction holds
+      state.T = state.W2; // or m1*g*sin + f, same when a=0
+      state.netForce = 0;
+    } else {
+      state.moving = true;
+      state.movingDir = driveDiff > 0 ? 1 : -1; // +1 m2 down, -1 m1 down
+      const frictionForce = state.fk * (state.movingDir === 1 ? 1 : -1); // opposes motion
+      state.friction = -frictionForce; // store magnitude with sign? let's store actual friction vector along incline on m1
+      if (state.movingDir === 1) {
+        // m2 down, m1 up incline
+        state.a = (state.W2 - state.W1sin - state.fk) / (m1 + m2);
+        state.T = m2 * (g - state.a);
+      } else {
+        // m1 down incline, m2 up
+        state.a = (state.W1sin - state.W2 - state.fk) / (m1 + m2);
+        state.T = m2 * (g + state.a);
+      }
+      state.netForce = (m1 + m2) * state.a;
+    }
+  }
+  function updatePositions(dt) {
+    if (!state.running || !state.moving) return;
+    const { v, a, movingDir } = state;
+    const newV = v + a * dt;
+    // check direction change (jitter prevention)
+    if (v * newV < 0) {
+      state.v = 0;
+      state.running = false; // will re-evaluate on next physics step
+      return;
+    }
+    state.v = newV;
+    const ds = state.v * dt * 100; // scale to pixels (1m = 100px)
+    state.x1 += ds * movingDir * Math.cos(deg2rad(state.theta));
+    state.y1 += ds * movingDir * Math.sin(deg2rad(state.theta));
+    state.y2 -= ds * movingDir; // m2 moves opposite to m1 along rope
+    // boundary checks
+    const rad = deg2rad(state.theta);
+    const maxX1 = state.inclineLen * Math.cos(rad);
+    const maxY1 = state.inclineLen * Math.sin(rad);
+    if (state.x1 < 0) { state.x1 = 0; state.y1 = 0; state.v = 0; state.running = false; }
+    else if (state.x1 > maxX1) { state.x1 = maxX1; state.y1 = maxY1; state.v = 0; state.running = false; }
+    const minY2 = state.pulleyY + 30;
+    const maxY2 = state.groundY - 30;
+    if (state.y2 < minY2) { state.y2 = minY2; state.v = 0; state.running = false; }
+    else if (state.y2 > maxY2) { state.y2 = maxY2; state.v = 0; state.running = false; }
+  }
+  function step(dt) {
+    if (!state.running) return;
+    // re-evaluate physics each step (params may change)
+    recomputePhysics();
+    if (!state.moving) { state.v = 0; state.running = false; return; }
+    updatePositions(dt);
+  }
+  function setParams(params) {
+    Object.assign(state, params);
+    if (params.theta !== undefined) recomputeGeometry();
+    if (params.muk !== undefined && params.mus !== undefined) {
+      state.muk = Math.min(state.muk, state.mus);
+    } else if (params.muk !== undefined) {
+      state.muk = Math.min(state.muk, state.mus);
+    } else if (params.mus !== undefined) {
+      state.muk = Math.min(state.muk, state.mus);
+    }
+    recomputePhysics();
+    notifySubscribers();
+  }
+  function reset() {
+    // Start block1 at 1/3 down the incline, block2 at middle height
+    const rad = deg2rad(state.theta);
+    const thirdLen = state.inclineLen / 3;
+    state.x1 = thirdLen * Math.cos(rad);
+    state.y1 = thirdLen * Math.sin(rad);
+    state.x2 = state.pulleyX;
+    state.y2 = state.pulleyY + 150;
+    state.v = 0;
+    state.running = false;
+    recomputePhysics();
+    notifySubscribers();
+  }
+  function setRunning(r) { state.running = r; notifySubscribers(); }
+  function setSpeed(s) { state.speed = s; }
+  function dragBlock1(dx, dy) {
+    const rad = deg2rad(state.theta);
+    const projected = (dx * Math.cos(rad) + dy * Math.sin(rad));
+    const newX1 = clamp(state.x1 + projected, 0, state.inclineLen * Math.cos(rad));
+    const ratio = newX1 / (state.inclineLen * Math.cos(rad)) || 0;
+    state.x1 = newX1;
+    state.y1 = ratio * state.inclineLen * Math.sin(rad);
+    state.y2 = state.pulleyY + 150 - ratio * (state.groundY - state.pulleyY - 180);
+    state.v = 0;
+    recomputePhysics();
+    notifySubscribers();
+  }
+  function dragTheta(newTheta) {
+    state.theta = clamp(newTheta, 0, 80);
+    recomputeGeometry();
+    // keep block1 at same relative position
+    const rad = deg2rad(state.theta);
+    const maxX1 = state.inclineLen * Math.cos(rad);
+    if (state.x1 > maxX1) { state.x1 = maxX1; state.y1 = state.inclineLen * Math.sin(rad); }
+    recomputePhysics();
+    notifySubscribers();
+  }
+  function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+  function notifySubscribers() { listeners.forEach(fn => fn(state)); }
+  function getState() { return {...state}; }
+  return { state: getState(), setParams, reset, setRunning, setSpeed, dragBlock1, dragTheta, step, subscribe, getState, notify: notifySubscribers, recomputeGeometry };
+})();
+
+// ============================================================
+// RENDERER (Canvas 2D)
+// ============================================================
+const Renderer = (() => {
+  let canvas, ctx, dpr = 1, width = 0, height = 0;
+  let staticCanvas, staticCtx;
+  let dirty = true, lastRender = 0;
+  const show = { W: true, N: true, T: true, f: true, Wsin: true, Wcos: true };
+  const colors = {
+    W: '#8e44ad', N: '#2c2c2c', T: '#1a3a5c', f: '#2980b9',
+    Wsin: '#e74c3c', Wcos: '#e67e22', bg: '#f5f5f0', grid: '#ddd'
+  };
+  // Check dark mode
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    colors.bg = '#141414'; colors.grid = '#333';
+  }
+  function init(c) {
+    canvas = c; ctx = canvas.getContext('2d');
+    staticCanvas = document.createElement('canvas');
+    staticCtx = staticCanvas.getContext('2d');
+    resize();
+    window.addEventListener('resize', resize);
+  }
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = rect.width; height = rect.height;
+    canvas.width = width * dpr; canvas.height = height * dpr;
+    canvas.style.width = width + 'px'; canvas.style.height = height + 'px';
+    staticCanvas.width = width * dpr; staticCanvas.height = height * dpr;
+    staticCtx.scale(dpr, dpr);
+    ctx.scale(dpr, dpr);
+    dirty = true;
+  }
+  function drawStatic(s) {
+    staticCtx.clearRect(0, 0, width, height);
+    const { theta, inclineLen, pulleyX, pulleyY, groundY } = s;
+    const rad = deg2rad(theta);
+    const baseX = 50, baseY = pulleyY + inclineLen * Math.sin(rad);
+    // ground
+    staticCtx.fillStyle = colors.bg;
+    staticCtx.fillRect(0, 0, width, height);
+    // grid
+    staticCtx.strokeStyle = colors.grid;
+    staticCtx.lineWidth = 0.5;
+    for (let x = 0; x < width; x += 50) { staticCtx.beginPath(); staticCtx.moveTo(x, 0); staticCtx.lineTo(x, height); staticCtx.stroke(); }
+    for (let y = 0; y < height; y += 50) { staticCtx.beginPath(); staticCtx.moveTo(0, y); staticCtx.lineTo(width, y); staticCtx.stroke(); }
+    // incline plane
+    staticCtx.fillStyle = '#d4a843';
+    staticCtx.beginPath();
+    staticCtx.moveTo(baseX, pulleyY);
+    staticCtx.lineTo(baseX + inclineLen * Math.cos(rad), pulleyY + inclineLen * Math.sin(rad));
+    staticCtx.lineTo(baseX + inclineLen * Math.cos(rad), height);
+    staticCtx.lineTo(baseX, height);
+    staticCtx.closePath();
+    staticCtx.fill();
+    staticCtx.strokeStyle = '#b8963a';
+    staticCtx.lineWidth = 2;
+    staticCtx.stroke();
+    // angle arc
+    staticCtx.beginPath();
+    staticCtx.arc(baseX, pulleyY, 40, -rad, 0);
+    staticCtx.strokeStyle = '#888';
+    staticCtx.lineWidth = 1.5;
+    staticCtx.stroke();
+    staticCtx.fillStyle = '#888';
+    staticCtx.font = '12px sans-serif';
+    staticCtx.fillText('θ', baseX + 45, pulleyY - 10);
+    // pulley
+    staticCtx.beginPath();
+    staticCtx.arc(pulleyX, pulleyY, 18, 0, Math.PI * 2);
+    staticCtx.fillStyle = '#888';
+    staticCtx.fill();
+    staticCtx.strokeStyle = '#666';
+    staticCtx.lineWidth = 2;
+    staticCtx.stroke();
+    staticCtx.beginPath();
+    staticCtx.arc(pulleyX, pulleyY, 10, 0, Math.PI * 2);
+    staticCtx.strokeStyle = '#aaa';
+    staticCtx.lineWidth = 1;
+    staticCtx.stroke();
+    // rope path (static)
+    staticCtx.strokeStyle = '#666';
+    staticCtx.lineWidth = 2;
+    staticCtx.setLineDash([5, 3]);
+    staticCtx.beginPath();
+    staticCtx.moveTo(pulleyX, pulleyY);
+    staticCtx.lineTo(pulleyX, groundY);
+    staticCtx.stroke();
+    staticCtx.setLineDash([]);
+    dirty = false;
+  }
+  function drawVector(fromX, fromY, toX, toY, color, label, value) {
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // arrow head
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    const headLen = 12;
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - headLen * Math.cos(angle - Math.PI/6), toY - headLen * Math.sin(angle - Math.PI/6));
+    ctx.lineTo(toX - headLen * Math.cos(angle + Math.PI/6), toY - headLen * Math.sin(angle + Math.PI/6));
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    // label
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = color;
+    const midX = (fromX + toX) / 2, midY = (fromY + toY) / 2;
+    ctx.fillText(`${label} ${value.toFixed(1)}N`, midX + 8, midY - 8);
+  }
+  function drawBlock(x, y, w, h, angle, color) {
+    ctx.save();
+    ctx.translate(x + w/2, y + h/2);
+    ctx.rotate(angle);
+    ctx.fillStyle = color;
+    ctx.fillRect(-w/2, -h/2, w, h);
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-w/2, -h/2, w, h);
+    ctx.restore();
+  }
+  function render(s) {
+    if (dirty) drawStatic(s);
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(staticCanvas, 0, 0);
+    const { theta, inclineLen, pulleyX, pulleyY, groundY, x1, y1, y2, m1, m2 } = s;
+    const rad = deg2rad(theta);
+    const baseX = 50;
+    const blockW = 40, blockH = 30;
+    // block 1 position
+    const bx1 = baseX + x1;
+    const by1 = pulleyY + y1;
+    // block 2 position
+    const bx2 = pulleyX - blockW/2;
+    const by2 = y2;
+    // rope
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bx1 + blockW/2 * Math.cos(rad), by1 + blockW/2 * Math.sin(rad));
+    ctx.lineTo(pulleyX, pulleyY);
+    ctx.lineTo(bx2 + blockW/2, by2);
+    ctx.stroke();
+    // block 1
+    drawBlock(bx1, by1, blockW, blockH, rad, '#f1c40f');
+    // block 2
+    drawBlock(bx2, by2, blockW, blockH, 0, '#f1c40f');
+    // vectors (draw from center of blocks)
+    const cx1 = bx1 + blockW/2 * Math.cos(rad), cy1 = by1 + blockH/2 * Math.sin(rad);
+    const cx2 = bx2 + blockW/2, cy2 = by2 + blockH/2;
+    const scale = Math.max(0.5, Math.min(3, 80 / Math.max(1, Math.abs(s.W1), Math.abs(s.W2), Math.abs(s.T), Math.abs(s.friction))));
+    if (show.W) {
+      // W1
+      drawVector(cx1, cy1, cx1, cy1 + s.W1 * scale, colors.W, 'W₁', s.W1);
+      // W2
+      drawVector(cx2, cy2, cx2, cy2 + s.W2 * scale, colors.W, 'W₂', s.W2);
+    }
+    if (show.N) {
+      const nx = cx1 + s.N * scale * Math.sin(rad);
+      const ny = cy1 - s.N * scale * Math.cos(rad);
+      drawVector(cx1, cy1, nx, ny, colors.N, 'N', s.N);
+    }
+    if (show.T) {
+      // T on m1 (up incline)
+      const tx1 = cx1 - s.T * scale * Math.cos(rad);
+      const ty1 = cy1 - s.T * scale * Math.sin(rad);
+      drawVector(cx1, cy1, tx1, ty1, colors.T, 'T', s.T);
+      // T on m2 (up)
+      drawVector(cx2, cy2, cx2, cy2 - s.T * scale, colors.T, 'T', s.T);
+    }
+    if (show.f && s.friction !== 0) {
+      const fmag = Math.abs(s.friction);
+      const fdir = s.friction > 0 ? 1 : -1; // positive = up incline
+      const fx = cx1 - fdir * fmag * scale * Math.cos(rad);
+      const fy = cy1 - fdir * fmag * scale * Math.sin(rad);
+      drawVector(cx1, cy1, fx, fy, colors.f, 'f', fmag);
+    }
+    if (show.Wsin) {
+      const wx = cx1 + s.W1sin * scale * Math.cos(rad);
+      const wy = cy1 + s.W1sin * scale * Math.sin(rad);
+      drawVector(cx1, cy1, wx, wy, colors.Wsin, 'W₁sinθ', s.W1sin);
+    }
+    if (show.Wcos) {
+      const wx = cx1 - s.W1cos * scale * Math.sin(rad);
+      const wy = cy1 + s.W1cos * scale * Math.cos(rad);
+      drawVector(cx1, cy1, wx, wy, colors.Wcos, 'W₁cosθ', s.W1cos);
+    }
+  }
+  function setShow(key, val) { show[key] = val; dirty = true; }
+  function getShow() { return {...show}; }
+  return { init, render, setShow, getShow, resize };
+})();
+const deg2rad = d => d * Math.PI / 180;
+
+// ============================================================
+// PANEL RENDERER (DOM, Batched Updates)
+// ============================================================
+const Panel = (() => {
+  let elements = {};
+  let lastValues = new Map();
+  function cacheElements() {
+    elements = {
+      statusBadge: document.getElementById('status-badge'),
+      statusReason: document.getElementById('status-reason'),
+      laws: document.getElementById('laws'),
+      formulas: document.getElementById('formulas'),
+      explanation: document.getElementById('explanation'),
+      summaryBody: document.querySelector('#summary-table tbody'),
+      legend: document.getElementById('legend'),
+      modeBeginner: document.getElementById('mode-beginner'),
+      modeFull: document.getElementById('mode-full')
+    };
+  }
+  function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
+  function setHTML(el, html) { if (el.innerHTML !== html) el.innerHTML = html; }
+  function fmt(n) { return n.toLocaleString('id-ID', {maximumFractionDigits: 2, minimumFractionDigits: 2}); }
+  function fmtInt(n) { return n.toLocaleString('id-ID'); }
+  function mode() { return elements.modeBeginner.classList.contains('active') ? 'beginner' : 'full'; }
+  function update(s) {
+    if (!elements.statusBadge) cacheElements();
+    // Status badge
+    let badgeClass = 'badge-balanced', statusText = 'Diam (seimbang)', reason = '';
+    if (s.moving) {
+      if (s.movingDir === 1) {
+        badgeClass = 'badge-moving-down';
+        statusText = 'Balok 2 turun, balok 1 naik bidang';
+        reason = `Komponen berat m₂ (${fmt(s.W2)} N) > komponen berat m₁ sejajar bidang (${fmt(s.W1sin)} N) + gesek kinetis (${fmt(s.fk)} N). Sistem dipercepat ke arah m₂ turun.`;
+      } else {
+        badgeClass = 'badge-moving-up';
+        statusText = 'Balok 1 turun bidang, balok 2 naik';
+        reason = `Komponen berat m₁ sejajar bidang (${fmt(s.W1sin)} N) > berat m₂ (${fmt(s.W2)} N) + gesek kinetis (${fmt(s.fk)} N). Sistem dipercepat ke arah m₁ turun bidang.`;
+      }
+    } else {
+      reason = `Selisih gaya penggerak (${fmt(Math.abs(s.W2 - s.W1sin))} N) ≤ gesek statis maksimum (${fmt(s.fsMax)} N). Gesek statis menahan sebesar ${fmt(Math.abs(s.friction))} N.`;
+    }
+    elements.statusBadge.className = `badge ${badgeClass}`;
+    setText(elements.statusBadge, statusText);
+    setText(elements.statusReason, reason);
+    // Laws
+    let lawsHtml = '';
+    if (!s.moving || (s.moving && Math.abs(s.a) < 0.01)) {
+      lawsHtml = `<p><strong>Hukum I Newton (Keseimbangan):</strong> ΣF = 0. Sistem diam atau bergerak lurus beraturan. Gaya-gaya saling menimbang.</p>`;
+    } else {
+      lawsHtml = `<p><strong>Hukum II Newton (Percepatan):</strong> ΣF = m·a. Resultan gaya tidak nol menyebabkan percepatan.</p>`;
+    }
+    lawsHtml += `<p><strong>Hukum III Newton (Aksi-Reaksi):</strong> Balok 1 menekan bidang → Bidang mendorong balik (N). Tali menarik balok 1 ke atas → Balok 1 menarik tali ke bawah (T).</p>`;
+    lawsHtml += `<p><strong>Gaya Gesek:</strong> ${s.moving ? `Kinetis (fₖ = μₖ·N = ${fmt(s.fk)} N) melawan gerak` : `Statis (fₛ ≤ μₛ·N = ${fmt(s.fsMax)} N) menahan gerak potensial. fₛ aktual = ${fmt(Math.abs(s.friction))} N`}.</p>`;
+    setHTML(elements.laws, lawsHtml);
+    // Formulas
+    const isBeginner = mode() === 'beginner';
+    let formulasHtml = '';
+    const addFormula = (name, general, subst, result, unit) => {
+      formulasHtml += `<div class="step">${name}: ${general}</div>`;
+      if (!isBeginner) {
+        formulasHtml += `<div class="step">${subst}</div>`;
+        formulasHtml += `<div class="step current">${result} ${unit}</div>`;
+      }
+    };
+    addFormula('W₁', 'W₁ = m₁·g', `W₁ = ${fmt(s.m1)} × ${fmt(s.g)}`, `W₁ = ${fmt(s.W1)}`, 'N');
+    addFormula('W₂', 'W₂ = m₂·g', `W₂ = ${fmt(s.m2)} × ${fmt(s.g)}`, `W₂ = ${fmt(s.W2)}`, 'N');
+    addFormula('W₁sinθ', 'W₁sinθ = m₁·g·sinθ', `W₁sinθ = ${fmt(s.m1)} × ${fmt(s.g)} × sin${fmt(s.theta)}°`, `W₁sinθ = ${fmt(s.W1sin)}`, 'N');
+    addFormula('W₁cosθ', 'W₁cosθ = m₁·g·cosθ', `W₁cosθ = ${fmt(s.m1)} × ${fmt(s.g)} × cos${fmt(s.theta)}°`, `W₁cosθ = ${fmt(s.W1cos)}`, 'N');
+    addFormula('N', 'N = m₁·g·cosθ', `N = ${fmt(s.m1)} × ${fmt(s.g)} × cos${fmt(s.theta)}°`, `N = ${fmt(s.N)}`, 'N');
+    addFormula('fₛ,mak', 'fₛ,mak = μₛ·N', `fₛ,mak = ${fmt(s.mus)} × ${fmt(s.N)}`, `fₛ,mak = ${fmt(s.fsMax)}`, 'N');
+    addFormula('fₖ', 'fₖ = μₖ·N', `fₖ = ${fmt(s.muk)} × ${fmt(s.N)}`, `fₖ = ${fmt(s.fk)}`, 'N');
+    const driveDiff = Math.abs(s.W2 - s.W1sin);
+    addFormula('Selisih', '|W₂ − W₁sinθ|', `|${fmt(s.W2)} − ${fmt(s.W1sin)}|`, `= ${fmt(driveDiff)}`, 'N');
+    if (s.moving) {
+      addFormula('a', 'a = (|W₂ − W₁sinθ| − fₖ) / (m₁ + m₂)', `a = (${fmt(driveDiff)} − ${fmt(s.fk)}) / (${fmt(s.m1)} + ${fmt(s.m2)})`, `a = ${fmt(Math.abs(s.a))}`, 'm/s²');
+      addFormula('T', s.movingDir === 1 ? 'T = m₂(g − a)' : 'T = m₂(g + a)', s.movingDir === 1 ? `T = ${fmt(s.m2)} × (${fmt(s.g)} − ${fmt(Math.abs(s.a))})` : `T = ${fmt(s.m2)} × (${fmt(s.g)} + ${fmt(Math.abs(s.a))})`, `T = ${fmt(s.T)}`, 'N');
+    } else {
+      addFormula('a', 'a = 0 (seimbang)', '—', 'a = 0', 'm/s²');
+      addFormula('T', 'T = W₂ (atau W₁sinθ + fₛ)', `T = ${fmt(s.W2)}`, `T = ${fmt(s.T)}`, 'N');
+    }
+    setHTML(elements.formulas, formulasHtml);
+    // Explanation
+    let explHtml = '';
+    if (isBeginner) {
+      explHtml = `<div class="analogy">Bayangkan dua orang tarik tambang: balok 2 tarik ke bawah dengan kekuatan ${fmt(s.W2)} N. Balok 1 di bidang miring mendapat dorongan ke bawah bidang sebesar ${fmt(s.W1sin)} N dari beratnya. Permukaan kasar memberikan "rem" (gesek) maksimal ${fmt(s.fsMax)} N.</div>`;
+      if (s.moving) {
+        explHtml += `<p>Siapa yang lebih kuat? ${s.movingDir === 1 ? 'Balok 2 menang tarik tambang, jadi dia turun dan balok 1 naik.' : 'Balok 1 menang (dorongan beratnya ke bawah bidang lebih besar), jadi dia turun bidang dan balok 2 naik.'}</p>`;
+        explHtml += `<p>Percepatan: ${fmt(Math.abs(s.a))} m/s². Tali menarik dengan tegangan ${fmt(s.T)} N.</p>`;
+      } else {
+        explHtml += `<p>Keduanya seimbang! Tidak ada yang menang. Gesek statis menahan sisa selisih ${fmt(Math.abs(s.friction))} N.</p>`;
+      }
+      explHtml += `<div class="question">💡 Coba perbesar sudut θ — gaya normal N akan berkurang, sehingga gesek maksimal turun. Apa yang terjadi?</div>`;
+    } else {
+      explHtml = `<p><span class="key-term">Berat (W)</span> = Tarikan gravitasi ke bawah. W₁ = ${fmt(s.W1)} N, W₂ = ${fmt(s.W2)} N.</p>`;
+      explHtml += `<p><span class="key-term">Gaya Normal (N)</span> = Dorongan balik permukaan tegak lurus bidang. N = ${fmt(s.N)} N. Semakin miring (θ↑), N↓.</p>`;
+      explHtml += `<p><span class="key-term">Tegangan (T)</span> = Tarikan tali pada kedua balok. T = ${fmt(s.T)} N (sama di kedua sisi katrol licin).</p>`;
+      explHtml += `<p><span class="key-term">Gesek Statis (fₛ)</span> = "Rem" saat diam, maksimum ${fmt(s.fsMax)} N. Aktual: ${fmt(Math.abs(s.friction))} N.</p>`;
+      explHtml += `<p><span class="key-term">Gesek Kinetis (fₖ)</span> = "Rem" saat bergerak, konstan ${fmt(s.fk)} N, selalu melawan arah gerak.</p>`;
+      explHtml += `<p><strong>Analisis gerak:</strong> Penggerak = |W₂ − W₁sinθ| = ${fmt(driveDiff)} N. ${s.moving ? `Lebih besar dari fₛ,mak → bergerak. Percepatan a = ${fmt(Math.abs(s.a))} m/s².` : `Kurang dari fₛ,mak → diam.`}</p>`;
+      explHtml += `<div class="question">💡 Tanya: Kalau μₖ = μₛ, apakah sistem bisa "melekat" di batas transisi?</div>`;
+    }
+    setHTML(elements.explanation, explHtml);
+    // Summary table
+    const rows = [
+      ['W₁ (Berat m₁)', `${fmt(s.W1)} N`],
+      ['W₂ (Berat m₂)', `${fmt(s.W2)} N`],
+      ['W₁ sin θ', `${fmt(s.W1sin)} N`],
+      ['W₁ cos θ', `${fmt(s.W1cos)} N`],
+      ['N (Normal)', `${fmt(s.N)} N`],
+      ['fₛ,mak', `${fmt(s.fsMax)} N`],
+      ['fₖ', `${fmt(s.fk)} N`],
+      ['f (aktual)', `${fmt(Math.abs(s.friction))} N (${s.moving ? 'kinetis' : 'statis'})`],
+      ['T (Tegangan)', `${fmt(s.T)} N`],
+      ['a (Percepatan)', `${fmt(Math.abs(s.a))} m/s² ${s.moving ? (s.movingDir === 1 ? '↓ m₂' : '↓ m₁') : '—'}`],
+      ['ΣF (Resultan)', `${fmt(s.netForce)} N`]
+    ];
+    let tableHtml = '';
+    rows.forEach(([k, v]) => { tableHtml += `<tr><td>${k}</td><td><span class="math">${v}</span></td></tr>`; });
+    setHTML(elements.summaryBody, tableHtml);
+    // Legend
+    const legendItems = [
+      { color: '#8e44ad', label: 'W (Berat) — ungu', key: 'W' },
+      { color: '#2c2c2c', label: 'N (Normal) — hitam', key: 'N' },
+      { color: '#1a3a5c', label: 'T (Tegangan) — biru tua', key: 'T' },
+      { color: '#2980b9', label: 'f (Gesek) — biru', key: 'f' },
+      { color: '#e74c3c', label: 'W sin θ — merah', key: 'Wsin' },
+      { color: '#e67e22', label: 'W cos θ — oranye', key: 'Wcos' }
+    ];
+    const show = Renderer.getShow ? Renderer.getShow() : {W:true,N:true,T:true,f:true,Wsin:true,Wcos:true};
+    let legendHtml = '';
+    legendItems.forEach(item => {
+      if (!show[item.key]) return;
+      legendHtml += `<div class="legend-item"><span class="legend-color" style="background:${item.color}"></span>${item.label}</div>`;
+    });
+    setHTML(elements.legend, legendHtml);
+  }
+  function setMode(m) {
+    elements.modeBeginner.classList.toggle('active', m === 'beginner');
+    elements.modeFull.classList.toggle('active', m === 'full');
+    // trigger re-render on next state update
+  }
+  return { update, setMode, cacheElements };
+})();
+
+// ============================================================
+// INTERACTION (Pointer Events, Drag)
+// ============================================================
+const Interaction = (() => {
+  let canvas, dragTarget = null, dragStart = {x:0,y:0}, lastPointer = {x:0,y:0};
+  let thetaDrag = false;
+  function init(c) {
+    canvas = c;
+    canvas.addEventListener('pointerdown', onDown, {passive: false});
+    canvas.addEventListener('pointermove', onMove, {passive: true});
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointerleave', onUp);
+    canvas.addEventListener('pointercancel', onUp);
+    canvas.addEventListener('wheel', onWheel, {passive: false});
+  }
+  function getCanvasPoint(e) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
+  }
+  function hitTestBlock1(px, py, s) {
+    const rad = deg2rad(s.theta);
+    const baseX = 50, baseY = s.pulleyY;
+    const bx = baseX + s.x1, by = baseY + s.y1;
+    const w = 40, h = 30;
+    // rotate point to block local space
+    const dx = px - (bx + w/2 * Math.cos(rad));
+    const dy = py - (by + h/2 * Math.sin(rad));
+    const rx = dx * Math.cos(rad) + dy * Math.sin(rad);
+    const ry = -dx * Math.sin(rad) + dy * Math.cos(rad);
+    return Math.abs(rx) < w/2 + 10 && Math.abs(ry) < h/2 + 10;
+  }
+  function hitTestBlock2(px, py, s) {
+    const w = 40, h = 30;
+    const bx = s.pulleyX - w/2, by = s.y2;
+    return px >= bx - 10 && px <= bx + w + 10 && py >= by - 10 && py <= by + h + 10;
+  }
+  function hitTestTheta(px, py, s) {
+    const baseX = 50, baseY = s.pulleyY;
+    const dx = px - baseX, dy = py - baseY;
+    return Math.hypot(dx, dy) < 25;
+  }
+  function onDown(e) {
+    if (e.button !== 0) return;
+    const pt = getCanvasPoint(e);
+    const s = Physics.getState();
+    if (hitTestTheta(pt.x, pt.y, s)) {
+      thetaDrag = true;
+      canvas.style.cursor = 'grabbing';
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
+    if (hitTestBlock1(pt.x, pt.y, s)) {
+      dragTarget = 'block1';
+      dragStart = {x: pt.x, y: pt.y};
+      Physics.setRunning(false);
+      canvas.style.cursor = 'grabbing';
+      canvas.classList.add('dragging');
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
+    if (hitTestBlock2(pt.x, pt.y, s)) {
+      dragTarget = 'block2';
+      dragStart = {x: pt.x, y: pt.y};
+      Physics.setRunning(false);
+      canvas.style.cursor = 'grabbing';
+      canvas.classList.add('dragging');
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
+  }
+  function onMove(e) {
+    if (thetaDrag) {
+      const pt = getCanvasPoint(e);
+      const baseX = 50, baseY = Physics.state().pulleyY;
+      const dx = pt.x - baseX, dy = pt.y - baseY;
+      let newTheta = Math.atan2(dy, dx) * 180 / Math.PI;
+      newTheta = Math.max(0, Math.min(80, 90 - newTheta)); // adjust
+      Physics.dragTheta(newTheta);
+      updateThetaUI(newTheta);
+      return;
+    }
+    if (!dragTarget) return;
+    const pt = getCanvasPoint(e);
+    const dx = pt.x - dragStart.x;
+    const dy = pt.y - dragStart.y;
+    if (dragTarget === 'block1') {
+      Physics.dragBlock1(dx, dy);
+      dragStart = pt;
+    } else if (dragTarget === 'block2') {
+      // convert vertical drag to block1 movement
+      const s = Physics.getState();
+      const rad = deg2rad(s.theta);
+      const inclineLen = s.inclineLen;
+      const maxY2 = s.groundY - 30;
+      const minY2 = s.pulleyY + 30;
+      const ratio = 1 - (pt.y - minY2) / (maxY2 - minY2);
+      const clampedRatio = Math.max(0, Math.min(1, ratio));
+      const newX1 = clampedRatio * inclineLen * Math.cos(rad);
+      const newY1 = clampedRatio * inclineLen * Math.sin(rad);
+      s.x1 = newX1; s.y1 = newY1;
+      s.y2 = pt.y;
+      s.v = 0;
+      Physics.recomputePhysics();
+      Physics.notify();
+      dragStart = pt;
+    }
+  }
+  function onUp(e) {
+    if (thetaDrag) { thetaDrag = false; canvas.style.cursor = 'grab'; return; }
+    if (!dragTarget) return;
+    dragTarget = null;
+    canvas.style.cursor = 'grab';
+    canvas.classList.remove('dragging');
+    // resume simulation from rest
+    Physics.setRunning(true);
+  }
+  function onWheel(e) {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const s = Physics.getState();
+      const delta = e.deltaY > 0 ? -1 : 1;
+      const newTheta = Math.max(0, Math.min(80, s.theta + delta));
+      Physics.dragTheta(newTheta);
+      updateThetaUI(newTheta);
+    }
+  }
+  function updateThetaUI(val) {
+    const slider = document.getElementById('theta');
+    const num = document.getElementById('theta-num');
+    slider.value = val; num.value = val;
+  }
+  return { init };
+})();
+
+// ============================================================
+// MAIN APP CONTROLLER
+// ============================================================
+const App = (() => {
+  let lastTime = 0, accumulator = 0, running = false;
+  const FIXED_DT = 1/120;
+  let fpsCounter = null, showFPS = false, frameCount = 0, lastFpsTime = 0;
+  function init() {
+    const canvas = document.getElementById('canvas');
+    Renderer.init(canvas);
+    Interaction.init(canvas);
+    Panel.cacheElements();
+    bindUI();
+    Physics.subscribe(state => {
+      Renderer.render(state);
+      Panel.update(state);
+    });
+    // initial setup
+    Physics.recomputeGeometry();
+    Physics.reset();
+    requestAnimationFrame(loop);
+    // keyboard for sliders
+    document.addEventListener('keydown', e => {
+      if (e.key === 'd' || e.key === 'D') toggleFPS();
+    });
+  }
+  function bindUI() {
+    // sliders sync
+    ['m1','m2','theta','mus','muk','speed'].forEach(id => {
+      const slider = document.getElementById(id);
+      const num = document.getElementById(id + '-num');
+      if (!slider || !num) return;
+      slider.addEventListener('input', e => {
+        num.value = e.target.value;
+        const val = parseFloat(e.target.value);
+        if (id === 'mus') { Physics.setParams({mus: val}); updateMukMax(val); }
+        else if (id === 'muk') { Physics.setParams({muk: val}); }
+        else if (id === 'theta') { Physics.setParams({theta: val}); }
+        else { Physics.setParams({[id]: val}); }
+      });
+      num.addEventListener('input', e => {
+        slider.value = e.target.value;
+        const val = parseFloat(e.target.value);
+        if (id === 'mus') { Physics.setParams({mus: val}); updateMukMax(val); }
+        else if (id === 'muk') { Physics.setParams({muk: val}); }
+        else if (id === 'theta') { Physics.setParams({theta: val}); }
+        else { Physics.setParams({[id]: val}); }
+      });
+    });
+    // g preset
+    const gPreset = document.getElementById('g-preset');
+    const gCustom = document.getElementById('g-custom');
+    gPreset.addEventListener('change', e => {
+      if (e.target.value === 'custom') { gCustom.style.display = 'inline-block'; }
+      else { gCustom.style.display = 'none'; Physics.setParams({g: parseFloat(e.target.value)}); document.getElementById('g-custom').value = e.target.value; }
+    });
+    gCustom.addEventListener('input', e => { Physics.setParams({g: parseFloat(e.target.value)}); });
+    // checkboxes
+    ['W','N','T','f','Wsin','Wcos'].forEach(key => {
+      const cb = document.getElementById('show-' + key.toLowerCase());
+      if (cb) cb.addEventListener('change', e => Renderer.setShow(key, e.target.checked));
+    });
+    // buttons
+    document.getElementById('btn-start').addEventListener('click', () => {
+      const btn = document.getElementById('btn-start');
+      Physics.setRunning(!Physics.getState().running);
+      btn.textContent = Physics.getState().running ? 'Jeda' : 'Mulai';
+    });
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      Physics.reset();
+      document.getElementById('btn-start').textContent = 'Mulai';
+    });
+    // presets
+    document.querySelectorAll('[data-preset]').forEach(btn => {
+      btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+    });
+    // mode toggle
+    document.getElementById('mode-beginner').addEventListener('click', () => Panel.setMode('beginner'));
+    document.getElementById('mode-full').addEventListener('click', () => Panel.setMode('full'));
+  }
+  function updateMukMax(mus) {
+    const mukSlider = document.getElementById('muk');
+    const mukNum = document.getElementById('muk-num');
+    mukSlider.max = mus.toFixed(2);
+    if (parseFloat(mukSlider.value) > mus) {
+      mukSlider.value = mus.toFixed(2);
+      mukNum.value = mus.toFixed(2);
+      Physics.setParams({muk: mus});
+    }
+  }
+  function applyPreset(name) {
+    const presets = {
+      balanced: {m1:2, m2:1.5, theta:30, mus:0.4, muk:0.3, g:9.8},
+      'm2-down': {m1:2, m2:4, theta:30, mus:0.2, muk:0.15, g:9.8},
+      'm1-down': {m1:5, m2:1, theta:45, mus:0.2, muk:0.15, g:9.8},
+      'no-friction': {m1:2, m2:2, theta:30, mus:0, muk:0, g:9.8},
+      moon: {m1:2, m2:2, theta:30, mus:0.3, muk:0.2, g:1.62}
+    };
+    const p = presets[name];
+    Object.keys(p).forEach(k => {
+      const slider = document.getElementById(k === 'mus' ? 'mus' : k === 'muk' ? 'muk' : k);
+      const num = document.getElementById(k === 'mus' ? 'mus-num' : k === 'muk' ? 'muk-num' : k + '-num');
+      if (slider) slider.value = p[k];
+      if (num) num.value = p[k];
+    });
+    if (name === 'moon') { document.getElementById('g-preset').value = '1.62'; document.getElementById('g-custom').style.display = 'none'; }
+    Physics.setParams(p);
+    if (name === 'moon') updateMukMax(p.mus);
+    Physics.reset();
+    document.getElementById('btn-start').textContent = 'Mulai';
+  }
+  function loop(time) {
+      requestAnimationFrame(loop);
+      if (document.hidden) return;
+      const dt = (time - lastTime) / 1000;
+      lastTime = time;
+      if (!running) { running = true; return; }
+      if (Physics.getState().running) {
+        accumulator += dt * Physics.getState().speed;
+        while (accumulator >= FIXED_DT) {
+          Physics.step(FIXED_DT);
+          accumulator -= FIXED_DT;
+        }
+      }
+      const s = Physics.getState();
+      Renderer.render(s);
+      Panel.update(s);
+      if (showFPS) updateFPS(time);
+  }
+  function updateFPS(time) {
+    frameCount++;
+    if (time - lastFpsTime >= 1000) {
+      const fps = Math.round(frameCount * 1000 / (time - lastFpsTime));
+      const renderTime = (time - lastTime).toFixed(2);
+      if (!fpsCounter) fpsCounter = document.getElementById('fps-counter');
+      fpsCounter.textContent = `FPS: ${fps} | Render: ${renderTime}ms`;
+      frameCount = 0; lastFpsTime = time;
+    }
+  }
+  function toggleFPS() {
+    showFPS = !showFPS;
+    const el = document.getElementById('fps-counter');
+    el.classList.toggle('hidden', !showFPS);
+  }
+  return { init };
+})();
+
+// Expose for testing
+window.Physics = Physics;
+window.Renderer = Renderer;
+window.Panel = Panel;
+window.Interaction = Interaction;
+window.App = App;
+
+// ============================================================
+// START
+// ============================================================
+function startApp() {
+  if (typeof App !== 'undefined' && App.init) {
+    App.init();
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startApp);
+} else {
+  startApp();
+}
+</script>
+</body>
+</html>
